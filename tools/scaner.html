@@ -124,10 +124,9 @@
                         name: 'UART RX',
                         decoder: this.decodeUtf8String
                     }]
-                    // Dodaj więcej charakterystyk dla tego serwisu
                     ])
                 }]
-                // Dodaj więcej serwisów
+
                 ]);
             }
             
@@ -145,7 +144,6 @@
             }
             
             decodeAccelerometerData(value) {
-                // Specyficzna implementacja dla danych z akcelerometru
                 const x = value.getInt16(0, true);
                 const y = value.getInt16(2, true);
                 const z = value.getInt16(4, true);
@@ -153,12 +151,10 @@
             }
             
             decodeGenericInt(value) {
-                // Dekoder dla ogólnych danych liczbowych
                 return value.getInt32(0, true);
             }
             
             decodeUtf8String(value) {
-                // Dekoder dla danych tekstowych UTF-8
                 const decoder = new TextDecoder('utf-8');
                 return decoder.decode(value);
             }
@@ -245,12 +241,12 @@
                                 
                                 for (const characteristic of characteristics) {
                                     const characteristicConfig = this.config.getCharacteristicConfig(service.uuid, characteristic.uuid);
-                                    let action = `<button class="readValue px-2 py-1 bg-green-500 text-white rounded" data-service-id="${service.uuid}" data-characteristic-id="${characteristic.uuid}">Odczytaj</button>
+                                    let action = `<button class="readValue px-2 py-1 bg-green-500 text-white rounded" data-service-id="${service.uuid}" data-characteristic-id="${characteristic.uuid}">Read</button>
                                     <pre class="value"></pre>`;
                                     
                                     if (characteristicConfig && characteristicConfig.sender) {
                                         action = `<input type="text" class="inputValue px-2 py-1 border rounded" data-service-id="${service.uuid}" data-characteristic-id="${characteristic.uuid}">
-                                        <button class="sendValue px-2 py-1 bg-blue-500 text-white rounded" data-service-id="${service.uuid}" data-characteristic-id="${characteristic.uuid}">Wyślij</button>`;
+                                        <button class="sendValue px-2 py-1 bg-blue-500 text-white rounded" data-service-id="${service.uuid}" data-characteristic-id="${characteristic.uuid}">Send</button>`;
                                     }
                                     
                                     tableContent += `<tr>
@@ -283,7 +279,7 @@
                                         await characteristic.writeValue(value);
                                         console.log("SENT")
                                     } catch (error) {
-                                        console.error(`Błąd zapisu: ${error}`);
+                                        console.error(`Error: ${error}`);
                                     }
                                 });
                             });
@@ -312,9 +308,9 @@
                                         const decodedValue = decoder ? decoder(value) : "Nieznany format danych";
                                         const valueDisplay = e.target.nextElementSibling;
                                         
-                                        valueDisplay.textContent = `Odczytana wartość: ${decodedValue}`;
+                                        valueDisplay.textContent = `Value: ${decodedValue}`;
                                     } catch (error) {
-                                        console.error(`Błąd odczytu: ${error}`);
+                                        console.error(`Error: ${error}`);
                                     }
                                 });
                             });

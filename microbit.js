@@ -130,7 +130,7 @@ class MicrobitBT {
             
         }catch (error) {
             this.connected = false;
-            throw new Error('Błąd połączenia: ' + error);
+            throw new Error('Connection error: ' + error);
         }
         
     }
