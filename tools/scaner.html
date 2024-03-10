@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bluetooth Device Services</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+</head>
+<body class="p-4">
+    <button id="connect" class="px-4 py-2 bg-blue-500 text-white rounded-lg">Connect z Micro:bit</button>
+    <div id="services" class="mt-4"></div>
+    
+    <script>  
+        function toUTF8Array(str) {
+            var utf8 = [];
+            for (var i=0; i < str.length; i++) {
+                var charcode = str.charCodeAt(i);
+                if (charcode < 0x80) utf8.push(charcode);
+                else if (charcode < 0x800) {
+                    utf8.push(0xc0 | (charcode >> 6),
+                    0x80 | (charcode & 0x3f));
+                }
+                else if (charcode < 0xd800 || charcode >= 0xe000) {
+                    utf8.push(0xe0 | (charcode >> 12),
+                    0x80 | ((charcode>>6) & 0x3f),
+                    0x80 | (charcode & 0x3f));
+                }
+                // surrogate pair
+                else {
+                    i++;
+                    // UTF-16 encodes 0x10000-0x10FFFF by
+                    // subtracting 0x10000 and splitting the
+                    // 20 bits of 0x0-0xFFFFF into two halves
+                    charcode = 0x10000 + (((charcode & 0x3ff)<<10)
+                    | (str.charCodeAt(i) & 0x3ff));
+                    utf8.push(0xf0 | (charcode >>18),
+                    0x80 | ((charcode>>12) & 0x3f),
+                    0x80 | ((charcode>>6) & 0x3f),
+                    0x80 | (charcode & 0x3f));
+                }
+            }
+            return utf8;
+        }  
+        
+        // LED SErvice: e95dd91d-251d-470a-a062-fa1922dfa9a8
+        //e95d93ee-251d-470a-a062-fa1922dfa9a8 LED TEXT CH
+        class BluetoothConfig {
+            constructor() {
+                this.servicesConfig = new Map([
+                ['e95d0753-251d-470a-a062-fa1922dfa9a8', {
+                    name: 'Accelerometer Service',
+                    characteristics: new Map([
+                    ['e95dca4b-251d-470a-a062-fa1922dfa9a8', {
+                        name: 'Accelerometer Data',
+                        decoder: this.decodeAccelerometerData
+                    }],
+                    ['e95dfb24-251d-470a-a062-fa1922dfa9a8', {
+                        name: 'Accelerometer Period',
+                        decoder: this.decoderInt16
+                    }]
+                    // Dodaj więcej charakterystyk dla tego serwisu
+                    ])
+                }],
+                ['e95d93af-251d-470a-a062-fa1922dfa9a8', {
+                    name: 'LED Service ????',
+                    characteristics: new Map([])
+                }],
+                ['e95dd91d-251d-470a-a062-fa1922dfa9a8',{
+                    name: 'LED Service',
+                    characteristics: new Map([
+                    ['e95d7b77-251d-470a-a062-fa1922dfa9a8', {
+                        name: 'Led State',
+                        sender: this.writePixels,
+                        decoder: this.decoderInt8
+                    }],
+                    ['e95d0d2d-251d-470a-a062-fa1922dfa9a8', {
+                        name: "Led scroll",
+                        sender: this.sendText,
+                        decoder: this.decoderInt8
+                    }],
+                    ['e95d93ee-251d-470a-a062-fa1922dfa9a8', {
+                        name: 'LED Text',
+                        sender: this.sendText,
+                        decoder: this.decodeGenericInt
+                    }]
+                    
+                    ])
+                }],
+                ['e95d6100-251d-470a-a062-fa1922dfa9a8',{
+                    name: 'Temperature Service',
+                    characteristics: new Map([
+                    ['e95d9250-251d-470a-a062-fa1922dfa9a8', {
+                        name: 'Temperature Data',
+                        decoder: this.decodeTemperatureData
+                    }],
+                    ['e95d1b25-251d-470a-a062-fa1922dfa9a8', {
+                        name: 'Temperature Period',
+                        decoder: this.decoderInt16
+                        
+                    }]
+                    ])
+                }],
+                ['e95d9882-251d-470a-a062-fa1922dfa9a8', {
+                    name: 'Button Service',
+                    characteristics: new Map([
+                    ['e95dda90-251d-470a-a062-fa1922dfa9a8', {
+                        name: 'BTN A State',
+                        decoder: this.decoderInt8
+                    }],
+                    ['e95dda91-251d-470a-a062-fa1922dfa9a8', {
+                        name: 'BTN B State',
+                        decoder: this.decoderInt8
+                    }]
+                    ])
+                }],
+                ['6e400001-b5a3-f393-e0a9-e50e24dcca9e', {
+                    name: 'UART Service',
+                    characteristics: new Map([
+                    ['6e400002-b5a3-f393-e0a9-e50e24dcca9e', {
+                        name: 'UART TX',
+                        decoder: this.decodeUtf8String
+                    }],
+                    ['6e400003-b5a3-f393-e0a9-e50e24dcca9e', {
+                        name: 'UART RX',
+                        decoder: this.decodeUtf8String
+                    }]
+                    // Dodaj więcej charakterystyk dla tego serwisu
+                    ])
+                }]
+                // Dodaj więcej serwisów
+                ]);
+            }
+            
+            sendText(value) {
+                var data= new Uint8Array(toUTF8Array(value));
+                return data;
+                
+            }
+            
+            writePixels(value) {
+                //Clear
+                console.log("write pixels")
+                var data = new Uint8Array([0, 1]);
+                return [0x00, 0x00, 0x00, 0x00, 0x00]
+            }
+            
+            decodeAccelerometerData(value) {
+                // Specyficzna implementacja dla danych z akcelerometru
+                const x = value.getInt16(0, true);
+                const y = value.getInt16(2, true);
+                const z = value.getInt16(4, true);
+                return `x: ${x}, y: ${y}, z: ${z}`;
+            }
+            
+            decodeGenericInt(value) {
+                // Dekoder dla ogólnych danych liczbowych
+                return value.getInt32(0, true);
+            }
+            
+            decodeUtf8String(value) {
+                // Dekoder dla danych tekstowych UTF-8
+                const decoder = new TextDecoder('utf-8');
+                return decoder.decode(value);
+            }
+            
+            decodeTemperatureData(value) {
+                const temperature = value.getInt8(0, true);
+                return `${temperature}°C`;
+            }
+            
+            decoderInt8(value) {
+                return value.getInt8(0);
+            }
+            
+            decoderInt16(value) {
+                return value.getInt16(0);
+            }
+            
+            getServiceConfig(uuid) {
+                return this.servicesConfig.get(uuid);
+            }
+            
+            getCharacteristicConfig(serviceUuid, characteristicUuid) {
+                const serviceConfig = this.getServiceConfig(serviceUuid);
+                if (serviceConfig) {
+                    return serviceConfig.characteristics.get(characteristicUuid);
+                }
+                return undefined;
+            }
+        }
+        
+        
+        
+        class BluetoothDeviceServices {
+            constructor() {
+                this.device = null;
+                this.services = [];
+                this.config = new BluetoothConfig();
+            }
+            
+            async connectAndSetup() {
+                try {
+                    this.device = await navigator.bluetooth.requestDevice({
+                        acceptAllDevices: true,
+                        optionalServices: [
+                        'E95D6100-251D-470A-A062-FA1922DFA9A8'.toLowerCase()
+                        // 'e95d93af-251d-470a-a062-fa1922dfa9a8',
+                        // 'e95d0753-251d-470a-a062-fa1922dfa9a8',
+                        // 'e95d6100-251d-470a-a062-fa1922dfa9a8',
+                        // 'e95dd91d-251d-470a-a062-fa1922dfa9a8',
+                        // 'e95d9882-251d-470a-a062-fa1922dfa9a8'
+                        ]
+                    });
+                    
+                    const server = await this.device.gatt.connect();
+                    this.services = await server.getPrimaryServices();
+                    this.displayServices();
+                } catch (error) {
+                    console.error(error);
+                }
+            }
+            
+            async displayServices() {
+                const servicesContainer = document.getElementById('services');
+                servicesContainer.innerHTML = '';
+                
+                for (const service of this.services) {
+                    const serviceConfig = this.config.getServiceConfig(service.uuid);
+                    if (!serviceConfig) {
+                        console.error(`Unknown service: ${service.uuid}`);
+                        continue;
+                    }
+                    const characteristics = await service.getCharacteristics();
+                    let tableContent = `<div class="mt-4">
+                        <span class="inline-block bg-gray-200 rounded-full px-3 py-1 text-sm font-semibold text-gray-700">Serwis: ${serviceConfig.name} (${service.uuid})</span>
+                        <table class="table-auto w-full mt-2">
+                            <thead>
+                                <tr class="bg-gray-100">
+                                    <th class="px-4 py-2">Name</th>
+                                    <th class="px-4 py-2">UUID</th>
+                                    <th class="px-4 py-2">Akcje</th>
+                                </tr>
+                            </thead>
+                            <tbody>`;
+                                
+                                for (const characteristic of characteristics) {
+                                    const characteristicConfig = this.config.getCharacteristicConfig(service.uuid, characteristic.uuid);
+                                    let action = `<button class="readValue px-2 py-1 bg-green-500 text-white rounded" data-service-id="${service.uuid}" data-characteristic-id="${characteristic.uuid}">Odczytaj</button>
+                                    <pre class="value"></pre>`;
+                                    
+                                    if (characteristicConfig && characteristicConfig.sender) {
+                                        action = `<input type="text" class="inputValue px-2 py-1 border rounded" data-service-id="${service.uuid}" data-characteristic-id="${characteristic.uuid}">
+                                        <button class="sendValue px-2 py-1 bg-blue-500 text-white rounded" data-service-id="${service.uuid}" data-characteristic-id="${characteristic.uuid}">Wyślij</button>`;
+                                    }
+                                    
+                                    tableContent += `<tr>
+                                        <td class="border px-4 py-2">${characteristicConfig ? characteristicConfig.name : '<span class="danger">Unknown</span>'}</td>
+                                        <td class="border px-4 py-2">${characteristic.uuid}</td>
+                                        <td class="border px-4 py-2">${action}</td>
+                                    </tr>`;
+                                }
+                                
+                                tableContent += `</tbody></table></div>`;
+                                servicesContainer.innerHTML += tableContent;
+                            }
+                            
+                            document.querySelectorAll('.sendValue').forEach(button => {
+                                button.addEventListener('click', async (e) => {
+                                    const charUuid = e.target.getAttribute('data-characteristic-id');
+                                    const serviceUuid = e.target.getAttribute('data-service-id');
+                                    const service = this.services.find(s => s.uuid === serviceUuid);
+                                    const characteristic = await service.getCharacteristic(charUuid);
+                                    const inputValue = e.target.previousElementSibling.value;
+                                    const characteristicConfig = this.config.getCharacteristicConfig(serviceUuid, charUuid);
+                                    if (!characteristicConfig) {
+                                        console.error(`Unknown characteristic: ${charUuid}`);
+                                        return;
+                                    }
+                                    
+                                    try {
+                                        const value = characteristicConfig.sender(inputValue);
+                                        console.log(value);
+                                        await characteristic.writeValue(value);
+                                        console.log("SENT")
+                                    } catch (error) {
+                                        console.error(`Błąd zapisu: ${error}`);
+                                    }
+                                });
+                            });
+                            
+                            document.querySelectorAll('.readValue').forEach(button => {
+                                button.addEventListener('click', async (e) => {
+                                    const charUuid = e.target.getAttribute('data-characteristic-id');
+                                    const serviceUuid = e.target.getAttribute('data-service-id');
+                                    const service = this.services.find(s => s.uuid === serviceUuid);
+                                    const characteristic = await service.getCharacteristic(charUuid);
+                                    
+                                    const characteristicConfig = this.config.getCharacteristicConfig(serviceUuid, charUuid);
+                                    if (!characteristicConfig) {
+                                        const valueDisplay = e.target.nextElementSibling;
+                                        valueDisplay.textContent = `Nieznana charakterystyka: ${charUuid}`;
+                                        console.error(`Unknown characteristic: ${charUuid}`);
+                                        return;
+                                    }
+                                    
+                                    try {                                      
+                                        
+                                        const value = await characteristic.readValue();
+                                        console.log(value);
+                                        
+                                        const decoder = characteristicConfig.decoder;
+                                        const decodedValue = decoder ? decoder(value) : "Nieznany format danych";
+                                        const valueDisplay = e.target.nextElementSibling;
+                                        
+                                        valueDisplay.textContent = `Odczytana wartość: ${decodedValue}`;
+                                    } catch (error) {
+                                        console.error(`Błąd odczytu: ${error}`);
+                                    }
+                                });
+                            });
+                        }
+                    }
+                    
+                    const btDeviceServices = new BluetoothDeviceServices();
+                    
+                    document.getElementById('connect').addEventListener('click', () => {
+                        btDeviceServices.connectAndSetup();
+                    });
+                    
+                </script>
+                
+            </body>
+            </html>
+            

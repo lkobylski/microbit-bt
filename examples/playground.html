@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Micro:bit Playground</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <script src="../microbit.js"></script>    
+</head>
+<body class="flex flex-col min-h-screen bg-gray-200 p-8 justify-between">
+    <main class="flex-grow">
+        <div class="w-full max-w-4xl mx-auto">        
+            <h1 class="text-xl font-bold mb-4">Micro:bit Playground</h1>
+            <div class="max-w-4xl mx-auto flex justify-between items-center">
+                <button id="connect" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">Connect with micro:bit</button>
+                <span id="connectionStatus" class="py-2 px-4 rounded font-bold text-white bg-gray-500">Disconnected</span>
+            </div>
+            
+            
+            <div class="mt-8">
+                <h2 class="text-lg font-semibold mb-2">Tools:</h2>
+                <table class="table-auto w-full">
+                    <tbody>
+                        <tr>
+                            <td class="border px-4 py-2">Read temp</td>
+                            <td class="border px-4 py-2"><button class="read-temp bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded">Read temp</button></td>
+                            <td class="border px-4 py-2" id="tempValue">-- °C</td>
+                        </tr>
+                        <tr>
+                            <td class="border px-4 py-2">Read buttons state</td>
+                            <td class="border px-4 py-2"><button class="read-buttons bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded">Read buttons state</button></td>
+                            <td class="border px-4 py-2"><span id="buttonA">A: --</span> <span id="buttonB">B: --</span></td>
+                        </tr>
+                        <tr>
+                            <td class="border px-4 py-2">Read accelerometer data</td>
+                            <td class="border px-4 py-2"><button class="read-accelerometer bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded">Read accelerometer data</button></td>
+                            <td class="border px-4 py-2" id="accelerometerData">X: --, Y: --, Z: --</td>
+                        </tr>
+                        <tr>
+                            <td class="border px-4 py-2">Matrix LED</td>
+                            <td class="border px-4 py-2">
+                                <button class=" bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded send-ledText">Write text</button>
+                            </td>
+                            <td class="border px-4 py-2">
+                                <input type="text" id="ledText" class="border px-4 py-2" placeholder="Text to display">
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="border px-4 py-2">Send UART</td>
+                            <td class="border px-4 py-2">
+                                <button class=" bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 send-uart rounded">Send UART</button>
+                            </td>
+                            <td class="border px-4 py-2">
+                                <input type="text" id="uartTX" class="border px-4 py-2" placeholder="Text to send">
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </main> 
+    <footer class="w-full text-right p-4">
+        <span id="version" class="block text-right p-4"></span>
+    </footer>
+    
+    
+    <script>
+
+        function onConnected() {
+            document.getElementById('connectionStatus').classList.remove('bg-gray-500', 'bg-yellow-500');
+            document.getElementById('connectionStatus').classList.add('bg-green-500');
+            document.getElementById('connectionStatus').textContent = 'Connected';
+        }
+
+        function onConnecting() {
+            document.getElementById('connectionStatus').classList.remove('bg-green-500', 'bg-gray-500');
+            document.getElementById('connectionStatus').classList.add('bg-yellow-500');
+            document.getElementById('connectionStatus').textContent = 'Connecting...';
+        }
+
+        function onDisconnected() {
+            document.getElementById('connectionStatus').classList.remove('bg-green-500', 'bg-yellow-500');
+            document.getElementById('connectionStatus').classList.add('bg-gray-500');
+            document.getElementById('connectionStatus').textContent = 'Disconnected';
+            
+        }
+        
+        const microbit = new MicrobitBT();
+        
+        let ver = microbit.getVersion();
+        
+        document.getElementById('version').innerText = `MicrobitBT Version: ${ver}`;
+        
+        function updateAccelerometerData(data) {                        
+            document.getElementById('accelerometerData').innerText = `X: ${data.x}, Y: ${data.y}, Z: ${data.z}`;
+        }
+        
+        microbit.on('buttonA', function(state) {
+            document.getElementById('buttonA').innerText = `A: ${state}`;            
+        });
+        
+        microbit.on('buttonB', function(state) {            
+            document.getElementById('buttonB').innerText = `B: ${state}`;
+        });
+        
+        microbit.on('accelerometerChange', function(data) {            
+            updateAccelerometerData(data);
+        });
+        
+        microbit.on('disconnected', function() {
+            onDisconnected();
+        });
+        
+        microbit.on('temperatureChange', function(temp) {            
+            document.getElementById('tempValue').innerText = `${temp} °C`;
+        });
+        
+        
+        document.getElementById('connect').addEventListener('click', function() {
+            onConnecting();
+            console.log('An attempt to connect to the micro:bit has begun...');
+            try {
+                microbit.connect()
+                .then(() => {
+                    onConnected();
+                }).catch(error => {
+                    onDisconnected();
+                    throw new Error('Connection failed:', error);
+                });
+                
+            } catch (error) {
+                onDisconnected();
+                console.error('Error when trying to connect to micro:bit:', error);
+            }
+        });
+        
+        document.querySelector('.read-temp').addEventListener('click', function() {            
+            const temp = microbit.getTemperature();
+            document.getElementById('tempValue').innerText = `${temp} °C`;
+        });
+        
+        document.querySelector('.read-buttons').addEventListener('click', function() {            
+            const buttonA = microbit.getButtonAState();
+            const buttonB = microbit.getButtonBState();
+            document.getElementById('buttonA').innerText = `A: ${buttonA}`;
+            document.getElementById('buttonB').innerText = `B: ${buttonB}`;
+        });
+        
+        document.querySelector('.read-accelerometer').addEventListener('click', function() {            
+            let acclData = microbit.getAccelerometerData();
+            return updateAccelerometerData(acclData);
+        });
+        
+        document.querySelector('.send-ledText').addEventListener('click', function() {
+            const text = document.getElementById('ledText').value;            
+            microbit.writeText(text);
+        });
+        
+        document.querySelector('.send-uart').addEventListener('click', function() {
+            const text = document.getElementById('uartTX').value;
+            console.log('Send uart:', text);
+            microbit.sendToUart(text);
+        });
+    </script>
+</body>
+</html>

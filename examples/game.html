@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Micro:bit Game</title>
+    <style>
+        body { text-align: center; }
+        canvas {
+            background-color: #fafafa;
+            display: block;
+            margin: 20px auto;
+            border: 1px solid #ddd;
+        }
+        #connectBtn, #restartBtn {
+            display: block;
+            width: 200px;
+            margin: 20px auto;
+            padding: 10px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        #restartBtn { display: none; }
+    </style>
+</head>
+<body>
+    <button id="connectBtn">Connect micro:bit</button>
+    <button id="restartBtn">Restart Game</button>
+    <canvas id="gameCanvas"></canvas>
+    <script src="../microbit.js"></script>
+    <script>
+        const connectBtn = document.getElementById('connectBtn');
+        const restartBtn = document.getElementById('restartBtn');
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        canvas.width = 800;
+        canvas.height = 600;
+        let gameInterval;
+        let paddleWidth = 100;
+        let paddleHeight = 20;
+        let paddleX = (canvas.width - paddleWidth) / 2;
+        let paddleY = canvas.height - paddleHeight;
+        let ballRadius = 10;
+        let ballX = canvas.width / 2;
+        let ballY = paddleY - ballRadius;
+        let ballDX = 2;
+        let ballDY = -2;
+        let gameStarted = false;
+        let cannonActive = false;
+        let bullets = [];
+
+        //Bricks
+        let brickRowCount = 3;
+        let brickColumnCount = 9;
+        let brickWidth = 75;
+        let brickHeight = 20;
+        let brickPadding = 10;
+        let brickOffsetTop = 30;
+        let brickOffsetLeft = 30;
+        let bricks = [];
+        for(let c=0; c<brickColumnCount; c++) {
+            bricks[c] = [];
+            for(let r=0; r<brickRowCount; r++) {
+                bricks[c][r] = { x: 0, y: 0, status: 1 };
+            }
+        }
+
+        function drawPaddle() {
+            ctx.beginPath();
+            ctx.rect(paddleX, paddleY, paddleWidth, paddleHeight);
+            ctx.fillStyle = '#0095DD';
+            ctx.fill();
+            ctx.closePath();
+            // Draw cannon
+            if (cannonActive) {
+                ctx.beginPath();
+                ctx.rect(paddleX + paddleWidth / 4, paddleY - 10, 10, 10);
+                ctx.rect(paddleX + 3 * paddleWidth / 4 - 10, paddleY - 10, 10, 10);
+                ctx.fillStyle = 'green';
+                ctx.fill();
+                ctx.closePath();
+            }
+        }
+
+        function drawBall() {
+            ctx.beginPath();
+            ctx.arc(ballX, ballY, ballRadius, 0, Math.PI*2);
+            ctx.fillStyle = 'red';
+            ctx.fill();
+            ctx.closePath();
+        }
+
+        function drawBricks() {
+            for(let c=0; c<brickColumnCount; c++) {
+                for(let r=0; r<brickRowCount; r++) {
+                    if (bricks[c][r].status == 1) {
+                        let brickX = (c*(brickWidth+brickPadding))+brickOffsetLeft;
+                        let brickY = (r*(brickHeight+brickPadding))+brickOffsetTop;
+                        bricks[c][r].x = brickX;
+                        bricks[c][r].y = brickY;
+                        ctx.beginPath();
+                        ctx.rect(brickX, brickY, brickWidth, brickHeight);
+                        ctx.fillStyle = "#0095DD";
+                        ctx.fill();
+                        ctx.closePath();
+                    }
+                }
+            }
+        }
+
+        function collisionDetection() {
+            for(let c=0; c<brickColumnCount; c++) {
+                for(let r=0; r<brickRowCount; r++) {
+                    let b = bricks[c][r];
+                    if(b.status == 1) {
+                        if(ballX > b.x && ballX < b.x+brickWidth && ballY > b.y && ballY < b.y+brickHeight) {
+                            ballDY = -ballDY;
+                            b.status = 0;
+                        }
+                    }
+                }
+            }
+        }
+
+        function drawBullets() {
+            bullets.forEach((bullet, index) => {
+                ctx.beginPath();
+                ctx.arc(bullet.x, bullet.y, 5, 0, Math.PI*2);
+                ctx.fillStyle = 'black';
+                ctx.fill();
+                ctx.closePath();
+
+                bullet.y -= 4; // Speed of bullet   
+
+                // Bullet removal after going off-screen
+                if (bullet.y < 0) {
+                    bullets.splice(index, 1);
+                }
+
+                // Detection of projectile collision with bricks
+                for(let c=0; c<brickColumnCount; c++) {
+                    for(let r=0; r<brickRowCount; r++) {
+                        let brick = bricks[c][r];
+                        if(brick.status == 1) {
+                            if(bullet.x > brick.x && bullet.x < brick.x + brickWidth && bullet.y > brick.y && bullet.y < brick.y + brickHeight) {
+                                brick.status = 0;
+                                bullets.splice(index, 1);
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function update() {
+            if (!gameStarted) return;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drawPaddle();
+            drawBall();
+            drawBricks();
+            drawBullets();
+            collisionDetection();
+            ballX += ballDX;
+            ballY += ballDY;
+
+            if(ballX + ballDX > canvas.width-ballRadius || ballX + ballDX < ballRadius) {
+                ballDX = -ballDX;
+            }
+            if(ballY + ballDY < ballRadius) {
+                ballDY = -ballDY;
+            } else if(ballY + ballDY > canvas.height-ballRadius) {
+                if(ballX > paddleX && ballX < paddleX + paddleWidth) {
+                    ballDY = -ballDY;
+                } else {
+                    gameStarted = false;
+                    clearInterval(gameInterval);
+                    restartBtn.style.display = 'block';
+                }
+            }
+
+            if (paddleX < 0) paddleX = 0;
+            if (paddleX + paddleWidth > canvas.width) paddleX = canvas.width - paddleWidth;
+        }
+
+        class Smoother {
+            constructor(size) {
+                this.size = size;
+                this.values = [];
+            }
+            
+            add(value) {
+                if (this.values.length >= this.size) {
+                    this.values.shift();
+                }
+                this.values.push(value);
+            }
+            
+            getAverage() {
+                return this.values.reduce((acc, val) => acc + val, 0) / this.values.length;
+            }
+        }
+        
+        
+        const xSmoother = new Smoother(10);
+
+        connectBtn.addEventListener('click', function() {
+            const microbit = new MicrobitBT();
+            microbit.connect().then(() => {
+                gameStarted = true;
+                microbit.on("accelerometerChange", (data) => {
+                    const { x } = data;
+                    xSmoother.add(x);
+                    const smoothedX = xSmoother.getAverage();
+                    paddleX = (smoothedX + 1024) / 2048 * (canvas.width - paddleWidth);
+                });
+                microbit.on("buttonA", () => {
+                    cannonActive = !cannonActive;
+                });
+                microbit.on("buttonB", () => {
+                    if (cannonActive) {
+                        bullets.push({x: paddleX + paddleWidth / 2, y: paddleY});
+                    }
+                });
+                if (!gameInterval) {
+                    gameInterval = setInterval(update, 10);
+                }
+            }).catch(error => {
+                console.error("Connection failed", error);
+            });
+        });
+
+        restartBtn.addEventListener('click', function() {
+            document.location.reload();
+        });
+    </script>
+</body>
+</html>
