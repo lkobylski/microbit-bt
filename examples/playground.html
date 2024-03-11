@@ -54,6 +54,15 @@
                                 <input type="text" id="uartTX" class="border px-4 py-2" placeholder="Text to send">
                             </td>
                         </tr>
+                        <tr>
+                            <td class="border px-4 py-2">Received UART</td>
+                            <td class="border px-4 py-2">
+                                <button class=" bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 tx-uart-clear rounded">Clear</button>
+                            </td>
+                            <td class="border px-4 py-2">
+                                <pre id="tx-uart"></pre>
+                            </td>
+                        </tr>
                     </tbody>
                 </table>
             </div>
@@ -114,6 +123,10 @@
         microbit.on('temperatureChange', function(temp) {            
             document.getElementById('tempValue').innerText = `${temp} °C`;
         });
+
+        microbit.on('uartDataReceived', function(data) {
+            document.getElementById('tx-uart').innerText = `DATA: ${data}`;
+        });
         
         
         document.getElementById('connect').addEventListener('click', function() {
@@ -160,6 +173,10 @@
             const text = document.getElementById('uartTX').value;
             console.log('Send uart:', text);
             microbit.sendToUart(text);
+        });
+
+        document.querySelector('.tx-uart-clear').addEventListener('click', function() {
+            document.getElementById('tx-uart').innerText = '';
         });
     </script>
 </body>

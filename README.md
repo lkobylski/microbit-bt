@@ -63,8 +63,12 @@ microbit.on("accelerometer", ({ x, y, z }) => {
     console.log(`Accelerometer: x=${x}, y=${y}, z=${z}`);
 });
 ```
+## More examples
 
-**Check simple canvas game in assets/game.html**
+* Check simple canvas game in assets/game.html
+* Please check out the Playground example in examples/.
+
+
 
 ## Support and Contribution
 

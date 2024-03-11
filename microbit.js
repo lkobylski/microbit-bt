@@ -44,6 +44,7 @@ const IO_PIN_CONFIG_UUID = 'e95db9fe-251d-470a-a062-fa1922dfa9a8'
 const IO_PIN_PWM_UUID = 'e95dd822-251d-470a-a062-fa1922dfa9a8'
 
 const UART_SRV_UUID = "6e400001-b5a3-f393-e0a9-e50e24dcca9e";
+
 const UART_TX_UUID = "6e400002-b5a3-f393-e0a9-e50e24dcca9e";
 const UART_RX_UUID = "6e400003-b5a3-f393-e0a9-e50e24dcca9e";
 
@@ -92,6 +93,7 @@ class MicrobitBT {
             EVENT_BUTTON_B_CHANGED,
             EVENT_ACCELEROMETER_CHANGED,
             EVENT_TEMPERATURE_CHANGED,
+            UART_DATA_RECEIVED,
             EVENT_DISCONNECTED
         ];
         
@@ -102,7 +104,9 @@ class MicrobitBT {
         if (navigator.bluetooth === undefined) {
             throw new Error('Web Bluetooth API is not available');            
         }
-        
+
+        this.log("Connecting...")
+
         try {
             this.device = await navigator.bluetooth.requestDevice({               
                 filters: [{namePrefix: 'BBC micro:bit'}],
@@ -120,7 +124,7 @@ class MicrobitBT {
             
             this.connected = true;
             
-            this.log('Connected to ' + this.device.name);
+            this.log('Connected to ',this.device.name);
             
             await this.initializeCharacteristics(server);
 
@@ -145,15 +149,15 @@ class MicrobitBT {
                 
                 for (const characteristic of characteristics) {
                     this.assignCharacteristic(characteristic);  
-                    
-                    if (characteristic.properties.notify) {
+
+                    if (characteristic.properties.notify || characteristic.uuid === UART_TX_UUID){
                         await characteristic.startNotifications();
                         this.log('Notifications started for ' + characteristic.uuid);
                         characteristic.addEventListener('characteristicvaluechanged',
                         this.characteristicUpdated.bind(this)
                         );
                     }
-                    
+
                 }
             }
         } catch (error) {
@@ -216,23 +220,19 @@ class MicrobitBT {
                     this.log('Button B state updated');
                 }
             break;
-            
-            case UART_RX_UUID:
-                console.log("Received data via UART: " + value);
+
+            case UART_TX_UUID:
                 const receivedData = new TextDecoder().decode(value);
                 this.emit(UART_DATA_RECEIVED, receivedData);
-                console.log("Received data via UART RX: " + receivedData);
-            break;
+                this.log(`UART data received: ${receivedData}`);
 
-            case UART_TX_UUID:            
-                console.log("Received data via UART TX: " + value);
-            break;
+                break;
             case 'e95db84c-251d-470a-a062-fa1922dfa9a8':
-                console.log("unknown: " + value);
+               this.log("unsupported event (e95db84c-251d-470a-a062-fa1922dfa9a8): ",value);
             break;
 
             case 'e95d9775-251d-470a-a062-fa1922dfa9a8':
-                console.log("unknown: " + value);
+                this.log("unsupported event (e95d9775-251d-470a-a062-fa1922dfa9a8): ",value);
             break;
 
         }
@@ -352,12 +352,12 @@ class MicrobitBT {
     }
     
     
-    log(message) {        
-        this.logger.log(message);
+    log(message, ...args) {
+        this.logger.log(message, ...args);
     }
 
-    error(message) {
-        this.logger.error(message);
+    error(message, ...args) {
+        this.logger.error(message, ...args);
     }
     
     getVersion() {
@@ -373,12 +373,12 @@ class Logger {
         this.active = active
     }
     
-    log(message) {
+    log(message, ...args) {
         if (!this.active) return;
-        this._logger.log(message);
+        this._logger.log(message, ...args);
     }
     
-    error(message) {       
-        this._logger.error(message);
+    error(message, ...args) {
+        this._logger.error(message, ...args);
     }
 }
